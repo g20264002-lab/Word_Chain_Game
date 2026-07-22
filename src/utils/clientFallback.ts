@@ -253,31 +253,13 @@ export function processFallbackWordChain(
   }
 
   if (candidates.length === 0) {
-    // Generate fallback word if possible
-    const CommonSuffixes = ['기', '자', '구', '가', '선', '물', '상', '화', '림', '정'];
-    for (const startSyl of validAiStarts) {
-      for (const endSyl of CommonSuffixes) {
-        const generated = startSyl + endSyl;
-        if (!historyWords.includes(generated) && generated !== trimmed) {
-          candidates.push({
-            word: generated,
-            meaning: '한국어 이음 단어',
-            level: 'EASY',
-          });
-          break;
-        }
-      }
-    }
-  }
-
-  if (candidates.length === 0) {
     return {
       valid: true,
       userWord: trimmed,
       userWordMeaning: userMeaningText,
       aiWord: null,
       aiWordMeaning: '',
-      aiComment: '더 이상 이을 단어가 생각나지 않네요! 당신의 승리입니다! 🎉',
+      aiComment: '더 이상 이을 수 있는 표준어가 생각나지 않네요! 당신의 승리입니다! 🎉',
       giveUp: true,
     };
   }

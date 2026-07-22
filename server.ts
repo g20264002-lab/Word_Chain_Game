@@ -1157,7 +1157,8 @@ app.post('/api/wordchain/play', async (req, res) => {
 과제:
 1. 플레이어의 단어 "${trimmedUserWord}"가 국립국어원 표준국어대사전에 실제로 존재하는 올바른 명사인지 검증하세요. (사전에 없거나 억지 조어면 userWordValid: false)
 2. 플레이어 단어 "${trimmedUserWord}"의 정확하고 명확한 사전적 뜻풀이(userWordMeaning)를 작성하세요.
-3. 당신(AI)이 받아쳐서 이을 단어(aiWord)를 반드시 국립국어원 표준국어대사전에 실제 등재되어 있는 정식 명사(2글자~4글자) 중에서 하나 고르세요.
+3. 당신(AI)이 받아쳐서 이을 단어(aiWord)를 반드시 국립국어원 표준국어대사전 또는 우리말샘에 실제로 등재되어 있는 정식 명사(2글자~4글자) 중에서만 선택하세요.
+   - [★절대주의★] 사전에 존재하지 않는 억지 조합 단어, 임의로 지어낸 신조어나 유령 어휘는 절대로 제출하지 마십시오! 실제로 존재하는 정식 명사만 허용됩니다. 만약 해당 음절로 시작하는 실존 단어가 생각이 나지 않거나 전혀 없는 경우, 절대로 단어를 지어내지 말고 giveUp: true 로 응답하세요.
    - 시작 음절 조건: '${userLastChar}'${allowInitialSoundRule && validAiStarts.length > 1 ? ` (또는 두음법칙 '${validAiStarts.slice(1).join("', '")}')` : ''} 음절로 시작!
    - 이미 사용된 단어 목록에 없어야 함!
    - 글자 수 제한 규칙 (${wordLengthMode}) 준수!
