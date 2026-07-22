@@ -15,6 +15,7 @@ import { WordDictionaryModal } from './components/WordDictionaryModal';
 import { GitHubPagesExportModal } from './components/GitHubPagesExportModal';
 import { GameStatsPanel } from './components/GameStatsPanel';
 import { sound } from './utils/sound';
+import { processClientWordChain, getClientHints } from './utils/clientGameEngine';
 
 export default function App() {
   const [difficulty, setDifficulty] = useState<DifficultyLevel>('MEDIUM');
@@ -80,6 +81,8 @@ export default function App() {
 
     const userMsgId = Date.now().toString();
 
+    let data: any = null;
+
     try {
       const res = await fetch('/api/wordchain/play', {
         method: 'POST',
@@ -93,124 +96,128 @@ export default function App() {
         }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.valid) {
-        sound.playError();
-        const invalidMsg: ChatMessage = {
-          id: userMsgId,
-          sender: 'user',
-          word: userWord,
-          isInvalid: true,
-          invalidReason: data.errorReason || '올바르지 않은 단어입니다.',
-          timestamp: Date.now(),
-        };
-        setMessages((prev) => [...prev, invalidMsg]);
-        setIsAiThinking(false);
-        return;
+      if (res.ok) {
+        data = await res.json();
       }
+    } catch (err) {
+      console.warn('Backend API unavailable, switching to client game engine fallback:', err);
+    }
 
-      // Valid User Turn
-      sound.playCorrect();
+    // Fallback to client-side game engine if API request failed or returned invalid response
+    if (!data) {
+      data = processClientWordChain(userWord, lastWord, historyWords, difficulty, rules);
+    }
 
-      const userValidMsg: ChatMessage = {
+    if (!data.valid) {
+      sound.playError();
+      const invalidMsg: ChatMessage = {
         id: userMsgId,
         sender: 'user',
-        word: data.userWord,
-        meaning: data.userWordMeaning,
+        word: userWord,
+        isInvalid: true,
+        invalidReason: data.errorReason || '올바르지 않은 단어입니다.',
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, invalidMsg]);
+      setIsAiThinking(false);
+      return;
+    }
+
+    // Valid User Turn
+    sound.playCorrect();
+
+    const userValidMsg: ChatMessage = {
+      id: userMsgId,
+      sender: 'user',
+      word: data.userWord,
+      meaning: data.userWordMeaning,
+      timestamp: Date.now(),
+    };
+
+    setMessages((prev) => [...prev, userValidMsg]);
+
+    // Update Word History Stats
+    const newLongest =
+      data.userWord.length > stats.longestWord.length
+        ? data.userWord
+        : stats.longestWord;
+
+    setStats((prev) => ({
+      ...prev,
+      wordsUsedCount: prev.wordsUsedCount + 1,
+      longestWord: newLongest,
+      wordHistory: [
+        ...prev.wordHistory,
+        { word: data.userWord, sender: 'user', timestamp: Date.now(), meaning: data.userWordMeaning },
+      ],
+    }));
+
+    // Check if AI surrendered
+    if (data.giveUp || !data.aiWord) {
+      setTimeout(() => {
+        sound.playWin();
+        setIsAiThinking(false);
+
+        const winSystemMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          sender: 'ai',
+          word: '항복!',
+          comment: data.aiComment || '더 이상 이어받을 단어가 생각나지 않네요! 당신의 승리입니다! 🎉',
+          timestamp: Date.now(),
+        };
+
+        setMessages((prev) => [...prev, winSystemMsg]);
+
+        setStats((prev) => {
+          const nextStreak = prev.currentStreak + 1;
+          return {
+            ...prev,
+            wins: prev.wins + 1,
+            currentStreak: nextStreak,
+            maxStreak: Math.max(prev.maxStreak, nextStreak),
+          };
+        });
+      }, 600);
+      return;
+    }
+
+    // AI Turn Success
+    setTimeout(() => {
+      setIsAiThinking(false);
+      sound.playPop();
+
+      const aiMsg: ChatMessage = {
+        id: (Date.now() + 2).toString(),
+        sender: 'ai',
+        word: data.aiWord,
+        meaning: data.aiWordMeaning,
+        comment: data.aiComment,
         timestamp: Date.now(),
       };
 
-      setMessages((prev) => [...prev, userValidMsg]);
+      setMessages((prev) => [...prev, aiMsg]);
 
-      // Update Word History Stats
-      const newLongest =
-        data.userWord.length > stats.longestWord.length
-          ? data.userWord
-          : stats.longestWord;
+      const aiLongest =
+        data.aiWord.length > newLongest.length ? data.aiWord : newLongest;
 
       setStats((prev) => ({
         ...prev,
         wordsUsedCount: prev.wordsUsedCount + 1,
-        longestWord: newLongest,
+        longestWord: aiLongest,
         wordHistory: [
           ...prev.wordHistory,
-          { word: data.userWord, sender: 'user', timestamp: Date.now(), meaning: data.userWordMeaning },
+          { word: data.aiWord, sender: 'ai', timestamp: Date.now(), meaning: data.aiWordMeaning },
         ],
       }));
-
-      // Check if AI surrendered
-      if (data.giveUp || !data.aiWord) {
-        setTimeout(() => {
-          sound.playWin();
-          setIsAiThinking(false);
-
-          const winSystemMsg: ChatMessage = {
-            id: (Date.now() + 1).toString(),
-            sender: 'ai',
-            word: '항복!',
-            comment: data.aiComment || '더 이상 이어받을 단어가 생각나지 않네요! 당신의 승리입니다! 🎉',
-            timestamp: Date.now(),
-          };
-
-          setMessages((prev) => [...prev, winSystemMsg]);
-
-          setStats((prev) => {
-            const nextStreak = prev.currentStreak + 1;
-            return {
-              ...prev,
-              wins: prev.wins + 1,
-              currentStreak: nextStreak,
-              maxStreak: Math.max(prev.maxStreak, nextStreak),
-            };
-          });
-        }, 600);
-        return;
-      }
-
-      // AI Turn Success
-      setTimeout(() => {
-        setIsAiThinking(false);
-        sound.playPop();
-
-        const aiMsg: ChatMessage = {
-          id: (Date.now() + 2).toString(),
-          sender: 'ai',
-          word: data.aiWord,
-          meaning: data.aiWordMeaning,
-          comment: data.aiComment,
-          timestamp: Date.now(),
-        };
-
-        setMessages((prev) => [...prev, aiMsg]);
-
-        const aiLongest =
-          data.aiWord.length > newLongest.length ? data.aiWord : newLongest;
-
-        setStats((prev) => ({
-          ...prev,
-          wordsUsedCount: prev.wordsUsedCount + 1,
-          longestWord: aiLongest,
-          wordHistory: [
-            ...prev.wordHistory,
-            { word: data.aiWord, sender: 'ai', timestamp: Date.now(), meaning: data.aiWordMeaning },
-          ],
-        }));
-      }, 700);
-
-    } catch (err) {
-      console.error('Submit word error:', err);
-      sound.playError();
-      setIsAiThinking(false);
-    }
+    }, 700);
   };
 
   // Request Hint from AI
   const handleRequestHint = async () => {
     if (!lastWord) return;
     setIsRequestingHint(true);
+    const lastChar = lastWord.charAt(lastWord.length - 1);
     try {
-      const lastChar = lastWord.charAt(lastWord.length - 1);
       const res = await fetch('/api/wordchain/hint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -220,13 +227,21 @@ export default function App() {
           historyWords,
         }),
       });
-      const data = await res.json();
-      setHints(data.hints || []);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.hints && data.hints.length > 0) {
+          setHints(data.hints);
+          return;
+        }
+      }
     } catch (err) {
-      console.error('Hint request failed:', err);
-    } finally {
-      setIsRequestingHint(false);
+      console.warn('Hint API unavailable, using client hints fallback:', err);
     }
+
+    // Fallback to client hints
+    const fallbackHints = getClientHints(lastChar, rules.allowInitialSoundRule, historyWords);
+    setHints(fallbackHints);
+    setIsRequestingHint(false);
   };
 
   // Surrender
