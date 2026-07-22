@@ -1,0 +1,6 @@
+{
+  "name": "끝말잇기 AI 챗봇",
+  "description": "난이도별 단어 수준 조절과 힌트, 단어 뜻풀이, GitHub Pages 배포 지원을 제공하는 한국어 끝말잇기 AI 챗봇",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
