@@ -1182,7 +1182,7 @@ JSON 형식으로 응답하세요:
 `;
 
         const response = await aiClient.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.6-flash',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
@@ -1327,7 +1327,7 @@ JSON 형식:
 }
 `;
         const response = await aiClient.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.6-flash',
           contents: prompt,
           config: { responseMimeType: 'application/json' }
         });
